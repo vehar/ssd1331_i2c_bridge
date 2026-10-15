@@ -1,3 +1,5 @@
+> Address update: all 0x02 extended frames and status reads below use **0x3E**. SSD1306 command/data frames use **0x3C** (also accepted at 0x3E). The base address rejects extensions and returns 0xFF on reads. Addresses are configurable in include/config.h. Both share one display state. See README.md for the CLI and shared-bus test procedure.
+
 # I²C protocol, version 1
 
 Slave address: **0x3C**, 7-bit (on-wire write 0x78, read 0x79).

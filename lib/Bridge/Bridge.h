@@ -25,7 +25,7 @@ class Bridge
 {
 public:
     explicit Bridge(Panel &p, uint8_t width = 128, uint8_t viewport = 0);
-    void start(); // called at every addressed write (including repeated START)
+    void start(bool allowExtensions = true); // called at every addressed write (including repeated START)
     void byte(uint8_t b);
     void stop();
     void reset();
@@ -57,6 +57,7 @@ private:
     bool flipX = false, flipY = false, inverse = false, entire = false, dirty = true, automatic = true;
     uint16_t fg = 0xFFFF, bg = 0, overflows = 0;
     Error error = OK;
+    bool allowExtensions = true;
     bool wantControl = true, co = false, isData = false, invalid = false, extension = false;
     uint8_t pending = 0, expected = 0, have = 0, args[6]{};
     uint8_t ext[516]{};

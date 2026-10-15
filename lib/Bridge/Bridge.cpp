@@ -52,9 +52,10 @@ void Bridge::reset()
     overflows = 0;
     lastScroll = lastRender = 0;
 }
-void Bridge::start()
+void Bridge::start(bool extended)
 {
     // SSD command arguments may continue across ordinary I2C transactions.
+    allowExtensions = extended;
     wantControl = true;
     co = isData = invalid = extension = false;
     extHave = 0;
@@ -66,7 +67,7 @@ void Bridge::byte(uint8_t b)
     if (wantControl)
     {
         wantControl = false;
-        if (b == 0x02)
+        if (b == 0x02 && allowExtensions)
         {
             extension = true;
             return;
@@ -345,7 +346,11 @@ bool Bridge::bit(uint8_t x, uint8_t y) const
     sy = (sy + startLine) % 64;
     if (scrolling && scrollVertical && sy >= scrollTop && sy < scrollTop + scrollRows)
         sy = scrollTop + (sy - scrollTop + scrollRows - scrollY) % scrollRows;
+#if BRIDGE_SCALE_TO_FIT
+    int sx = unsigned(x) * (width - 1) / 95;
+#else
     int sx = x + viewport;
+#endif
     if (flipX)
         sx = width - 1 - sx;
     if (scrolling && sy / 8 >= scrollStart && sy / 8 <= scrollEnd)

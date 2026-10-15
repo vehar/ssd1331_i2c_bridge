@@ -2,6 +2,11 @@
 #include "config.h"
 #include "stm32f1xx_hal.h"
 #include <string.h>
+#include "cli/serial_cli.h"
+#include "cli/oled_cli.h"
+static_assert(BRIDGE_I2C_ADDRESS != BRIDGE_EXT_I2C_ADDRESS, "I2C addresses must differ");
+static_assert(BRIDGE_I2C_ADDRESS >= 8 && BRIDGE_I2C_ADDRESS <= 0x77, "invalid base address");
+static_assert(BRIDGE_EXT_I2C_ADDRESS >= 8 && BRIDGE_EXT_I2C_ADDRESS <= 0x77, "invalid extension address");
 static SPI_HandleTypeDef spi;
 static void die()
 {
@@ -72,9 +77,10 @@ static volatile uint16_t events[BRIDGE_QUEUE_SIZE];
 static volatile uint16_t head = 0, tail = 0;
 static volatile bool queueFailed = false, busFailed = false;
 static volatile bool processing = false;
-static bool addressedWrite = false, transmitting = false;
+static volatile bool addressedWrite = false, transmitting = false;
 static uint8_t publishedStatus[16]{}, readStatus[16]{};
 static uint8_t txIndex = 0;
+static bool extendedAddress = false;
 static void push(uint16_t v)
 {
     if (queueFailed)
@@ -114,6 +120,7 @@ extern "C" void I2C1_EV_IRQHandler()
     {
         uint32_t s2 = I2C1->SR2; // SR1 then SR2 clears ADDR; stretching ends here
         endWrite();
+        extendedAddress = (s2 & I2C_SR2_DUALF) != 0;
         transmitting = (s2 & I2C_SR2_TRA) != 0;
         I2C1->CR2 |= I2C_CR2_ITBUFEN;
         if (transmitting)
@@ -129,12 +136,12 @@ extern "C" void I2C1_EV_IRQHandler()
             if (busFailed)
                 readStatus[3] = oled::BUS;
             txIndex = 0;
-            I2C1->DR = readStatus[txIndex++];
+            I2C1->DR = extendedAddress ? readStatus[txIndex++] : 0xFF;
         }
         else
         {
             addressedWrite = true;
-            push(0x100);
+            push(extendedAddress ? 0x102 : 0x100);
         }
     }
     if (sr & I2C_SR1_STOPF)
@@ -145,7 +152,7 @@ extern "C" void I2C1_EV_IRQHandler()
         transmitting = false;
     }
     if (transmitting && (I2C1->SR1 & I2C_SR1_TXE))
-        I2C1->DR = txIndex < 16 ? readStatus[txIndex++] : 0xFF;
+        I2C1->DR = extendedAddress && txIndex < 16 ? readStatus[txIndex++] : 0xFF;
 }
 extern "C" void I2C1_ER_IRQHandler()
 {
@@ -207,10 +214,10 @@ static void listen()
     I2C1->CR1 = 0;
     I2C1->CR2 = 36; // APB1 MHz; master sets the actual bus frequency
     I2C1->OAR1 = (1U << 14) | (BRIDGE_I2C_ADDRESS << 1);
-    I2C1->OAR2 = 0;
+    I2C1->OAR2 = (BRIDGE_EXT_I2C_ADDRESS << 1) | I2C_OAR2_ENDUAL;
     I2C1->CCR = 180;
     I2C1->TRISE = 37;
-    I2C1->CR1 = I2C_CR1_PE | I2C_CR1_ACK; // clock stretching enabled
+    I2C1->CR1 = I2C_CR1_PE | I2C_CR1_ACK | (BRIDGE_NO_STRETCH ? I2C_CR1_NOSTRETCH : 0);
     I2C1->CR2 |= I2C_CR2_ITEVTEN | I2C_CR2_ITBUFEN | I2C_CR2_ITERREN;
     HAL_NVIC_SetPriority(I2C1_EV_IRQn, 0, 0);
     HAL_NVIC_EnableIRQ(I2C1_EV_IRQn);
@@ -226,6 +233,9 @@ int main()
     bridge.render();
     bridge.status(publishedStatus);
     listen();
+    oled_cli_init(bridge);
+    cli_init();
+    cli_print_greeting();
     while (true)
     {
         if (queueFailed || busFailed)
@@ -248,7 +258,9 @@ int main()
             __DMB();
             tail = (tail + 1) & (BRIDGE_QUEUE_SIZE - 1);
             if (e == 0x100)
-                bridge.start();
+                bridge.start(false);
+            else if (e == 0x102)
+                bridge.start(true);
             else if (e == 0x101)
                 bridge.stop();
             else
@@ -260,6 +272,8 @@ int main()
             processing = true;
             bridge.tick(HAL_GetTick());
         }
+        if (tail == head && !addressedWrite && !transmitting)
+            cli_poll();
         uint8_t s[16];
         bridge.status(s);
         __disable_irq();

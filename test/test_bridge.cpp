@@ -53,6 +53,14 @@ int main()
     Mock m;
     Bridge b(m);
     b.reset();
+    // Base address rejects extension framing without touching panel.
+    m.clear();
+    b.start(false); b.byte(2); b.byte(0); b.byte(0); b.byte(0); b.stop();
+    assert(err(b) == CONTROL && m.commands.empty());
+    ext(b,6,{});
+    // Secondary accepts SSD1306 packets as well as extension packets.
+    b.start(true); b.byte(0); b.byte(0xB0); b.stop();
+    assert(err(b) == OK);
     // Common Adafruit-style initialization must not leak SSD1306 electrical values.
     tx(b, { 0,    0xAE, 0xD5, 0x80, 0xA8, 63,   0xD3, 0,    0x40, 0x8D, 0x14, 0x20, 0,
             0xA1, 0xC8, 0xDA, 0x12, 0x81, 0x7F, 0xD9, 0xF1, 0xDB, 0x40, 0xA4, 0xA6, 0xAF });
@@ -66,7 +74,7 @@ int main()
     assert(b.ramAt(0, 0) == 1 && b.ramAt(127, 7) == 0x80);
     m.clear();
     b.render();
-    assert(m.pixels.size() == 12288 && pixel(m, 0, 0) == 0xFFFF && pixel(m, 1, 0) == 0);
+    assert(m.pixels.size() == 12288 && pixel(m, 0, 0) == 0xF800 && pixel(m, 1, 0) == 0);
     // Foreground/background RGB565 and viewport crop.
     ext(b, 1, { 0xF8, 0, 0, 0x1F });
     m.clear();
@@ -76,6 +84,12 @@ int main()
     m.clear();
     b.render();
     assert(pixel(m, 95, 63) == 0xF800);
+#if BRIDGE_SCALE_TO_FIT
+    // Viewport ignored in fit mode; endpoints remain visible.
+    assert(pixel(m, 0, 0) == 0xF800);
+#else
+    assert(pixel(m, 0, 0) == 0x001F);
+#endif
     // Vertical addressing, page mode, page/column nibble writes.
     ext(b, 4, { 96, 0 });
     tx(b, { 0, 0x20, 1, 0x21, 4, 5, 0x22, 1, 2 });
@@ -131,15 +145,15 @@ int main()
     b.tick(1000);
     assert(m.pixels.empty());
     b.render();
-    assert(pixel(m, 0, 0) == 0xFFFF);
+    assert(pixel(m, 0, 0) == 0xF800);
     tx(b, { 0, 0xA7 });
     m.clear();
     b.render();
-    assert(pixel(m, 0, 0) == 0 && pixel(m, 1, 0) == 0xFFFF);
+    assert(pixel(m, 0, 0) == 0 && pixel(m, 1, 0) == 0xF800);
     tx(b, { 0, 0xA5 });
     m.clear();
     b.render();
-    assert(pixel(m, 0, 0) == 0xFFFF);
+    assert(pixel(m, 0, 0) == 0xF800);
     tx(b, { 0, 0xA4, 0xA6, 0xA0 });
     m.clear();
     b.render();
@@ -147,14 +161,14 @@ int main()
     ext(b, 4, { 128, 32 });
     m.clear();
     b.render();
-    assert(pixel(m, 95, 0) == 0xFFFF);
+    assert(pixel(m, 95, 0) == 0xF800);
     b.reset();
     tx(b, { 0x40, 1 });
     tx(b, { 0, 0x26, 0, 0, 7, 0, 0, 0xFF, 0x2F });
     b.tick(2000);
     m.clear();
     b.render();
-    assert(pixel(m, 1, 0) == 0xFFFF);
+    assert(pixel(m, 1, 0) == 0xF800);
     // Status and recovery after aborted, partially received command.
     b.fault(OVERFLOW);
     uint8_t status[16];

@@ -1,3 +1,57 @@
+# Update: UART CLI, separate extension address and optional scaling
+
+Apply all files in this patch over the uploaded project, preserving paths.
+No compiled firmware is included: the STM32 PlatformIO package could not be downloaded in this environment. Run `pio run` before flashing.
+
+- Base **0x3C**: SSD1306 command/data writes only. Control byte 0x02 is rejected; reads return 0xFF (no bridge status).
+- Secondary **0x3E**: SSD1306 writes AND all extended commands, with the existing 0x02 framing. Status reads are only here.
+- Both addresses share ONE framebuffer/panel. 0x3E is not a second display.
+- Config: `include/config.h`. `BRIDGE_SCALE_TO_FIT=1` fits the full virtual width into 96 columns; `0` restores the cropped viewport.
+- Fit uses nearest-neighbour horizontal resampling; height stays 64. Thin strokes can disappear. Viewport is ignored in fit mode.
+- UART1: **PA9 TX → USB-UART RX; PA10 RX ← USB-UART TX; common GND; 3.3 V logic; 115200 8N1**.
+- CLI uses the supplied history/editor/completion engine without FreeRTOS. History reduced to 4 lines for F103C8 RAM.
+- ASCII text supports letters/digits/spaces (lowercase rendered uppercase), 6×8 cells, black background, clipped at the right edge.
+- Native drawing disables automatic monochrome refresh. `mono` restores the saved framebuffer; `auto on` resumes automatic refresh.
+- CLI operates on the adapter only; it never sends data to another physical OLED.
+
+## Quick test
+
+```text
+help
+colors 0xF800 0x0000
+clear 0 0 95 63
+text 0 0 0xF800 "Hello 123"
+line 0 12 95 12 0x07E0
+rect 10 20 80 55 0xFFFF 0x001F 1
+dim 20 25 50 45
+pixel 95 63 0xF800
+status
+mono
+auto on
+```
+
+`ext OP BYTE ...` exposes existing extended opcodes (up to 14 payload bytes per CLI line), e.g. `ext 0x20 128 128 128 6` sets contrast/current. Longer raw/blit packets remain available through I2C. Hex bytes require a 0x prefix. `errors` clears sticky bridge errors.
+
+## Two displays on one address: changes and remaining diagnosis
+
+Two receivers can receive identical write broadcasts. ACK from the adapter can mask an absent or non-ACKing OLED, so a successful master transmission does not establish that both received data.
+
+The old ESP32 helper's `init()` only sent an EXTENDED RESET to the adapter. A physical SSD1306 receives no valid charge-pump/display-on initialization from that packet and can remain dark. The updated helper first resets the adapter via 0x3E, then sends a standard 128×64 SSD1306 initialization to 0x3C. All extended packets and status reads now use 0x3E. Existing ordinary SSD1306 drivers need no address change.
+
+`BRIDGE_NO_STRETCH=1` disables adapter clock stretching as a shared-bus diagnostic/compatibility mode. This is not proof that stretching caused the reported fault. I2C IRQs have highest priority and queue reception independent of SPI rendering; start testing at **100 kHz**, then validate 400 kHz with a logic analyzer. If adapter overrun appears, check IRQ latency or try `BRIDGE_NO_STRETCH=0`. Do not change modes live.
+
+Hardware verification:
+1. Power both displays before starting the master. Confirm the physical OLED works alone with its normal driver and that its address is also 0x3C.
+2. Connect both with common GND and 3.3 V pull-ups. Avoid parallel pull-ups that excessively load SDA/SCL.
+3. Run normal SSD1306 initialization, including charge pump 0x8D 0x14 and display on 0xAF. Broadcast a known 1024-byte 128×64 pattern at 0x3C.
+4. Both must show the same logical pattern (color panel resampled or cropped). Query bridge status at 0x3E, never 0x3C.
+5. Send colors/native drawing only to 0x3E; the physical OLED must retain its last image. CLI drawing also changes only the color panel.
+6. If only the original stays dark with a normal master driver, capture startup and framebuffer writes with/without adapter; compare SCL, SDA, reset, supply and charge-pump commands. The current software alone cannot establish that root cause.
+
+Verified locally: bridge tests in fit and crop modes, each including 20,000 malformed transactions; CLI tests for quoting/whitespace, colors, text blits, rectangle/clear, invalid input and output capture; ASan + UBSan. No physical hardware test or completed STM32 target build.
+
+---
+
 # STM32F103C8T6: SSD1306-compatible I²C to SSD1331 SPI bridge
 
 PlatformIO / STM32Cube project for an 8 MHz crystal Blue Pill, 64 KiB flash,
