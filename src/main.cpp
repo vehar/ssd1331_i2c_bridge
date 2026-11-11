@@ -1,9 +1,10 @@
 #include "Bridge.h"
+#include "cli/oled_cli.h"
+#include "cli/serial_cli.h"
 #include "config.h"
 #include "stm32f1xx_hal.h"
 #include <string.h>
-#include "cli/serial_cli.h"
-#include "cli/oled_cli.h"
+
 static_assert(BRIDGE_I2C_ADDRESS != BRIDGE_EXT_I2C_ADDRESS, "I2C addresses must differ");
 static_assert(BRIDGE_I2C_ADDRESS >= 8 && BRIDGE_I2C_ADDRESS <= 0x77, "invalid base address");
 static_assert(BRIDGE_EXT_I2C_ADDRESS >= 8 && BRIDGE_EXT_I2C_ADDRESS <= 0x77, "invalid extension address");
@@ -19,12 +20,12 @@ extern "C" void SysTick_Handler() { HAL_IncTick(); }
 static void clocks()
 {
     RCC_OscInitTypeDef o{};
-    o.OscillatorType = RCC_OSCILLATORTYPE_HSE;
-    o.HSEState = RCC_HSE_ON;
-    o.HSEPredivValue = RCC_HSE_PREDIV_DIV1;
+    o.OscillatorType = RCC_OSCILLATORTYPE_HSI;
+    o.HSIState = RCC_HSI_ON;
+    o.HSICalibrationValue = RCC_HSICALIBRATION_DEFAULT;
     o.PLL.PLLState = RCC_PLL_ON;
-    o.PLL.PLLSource = RCC_PLLSOURCE_HSE;
-    o.PLL.PLLMUL = RCC_PLL_MUL9;
+    o.PLL.PLLSource = RCC_PLLSOURCE_HSI_DIV2;
+    o.PLL.PLLMUL = RCC_PLL_MUL16;
     if (HAL_RCC_OscConfig(&o) != HAL_OK)
         die();
     RCC_ClkInitTypeDef c{};
