@@ -92,6 +92,7 @@ capacity by default, matching common Arduino `Wire` buffers.
 | `window(op, x0, y0, x1, y1)` | Opcode `0x13` or `0x14`, inclusive bounds | Clear or dim a native-color window. |
 | `copy(x0, y0, x1, y1, dx, dy)` | Source bounds and destination origin | Copy a native-color region. |
 | `row(x, y, colors, count)` | RGB565 array and pixel count | Send one row as independently addressed blits, split to fit the transmit buffer. |
+| `colorizeMono(x0, y0, x1, y1, fg, bg)` | Inclusive display coordinates and RGB565 foreground/background | Render the current visible mono-buffer bits in the region using these colors. |
 | `contrast(a, b, c, master)` | Three channel values and master current; defaults to 6 | Set SSD1331 contrast/current values. |
 | `scroll(h, start, rows, v, interval)` | Hardware scroll parameters | Configure SSD1331 hardware scrolling. |
 | `scrolling(on)` | Boolean | Stop or start hardware scrolling. Rewrite display RAM after stopping, per the controller behavior. |
@@ -130,3 +131,10 @@ native drawing does not update mono RAM, and a mono redraw replaces the full
 native image. For SSD1306-compatible command/data framing, use `commands()` and
 `monoData()`; for the full extension opcode set and payload definitions, see
 [PROTOCOL.md](PROTOCOL.md).
+
+`colorizeMono()` reads the existing mono bits through the current display
+mapping (including geometry, viewport/scale, inversion and scrolling) and
+renders only that visible region with the supplied RGB565 colors. It does not
+change mono RAM or the global `colors()` setting. Disable automatic refresh,
+render the mono image first, then colorize regions; a later full mono redraw
+restores the global mono colors, so reapply region colors afterward.

@@ -10,7 +10,10 @@ class BridgeClient
 
 public:
     static constexpr size_t TX_CAPACITY = 32;
-    explicit BridgeClient(TwoWire &w = Wire, uint8_t a = 0x3C, uint8_t ext = 0x3E) : wire(w), address(a), extendedAddress(ext) {}
+    explicit BridgeClient(TwoWire &w = Wire, uint8_t a = 0x3C, uint8_t ext = 0x3E)
+        : wire(w), address(a), extendedAddress(ext)
+    {
+    }
     bool status(uint8_t s[16])
     {
         if (wire.requestFrom(extendedAddress, uint8_t(16)) != 16)
@@ -78,13 +81,14 @@ public:
         }
         return true;
     }
-    bool init() {
-        if (!extended(0)) return false;
+    bool init()
+    {
+        if (!extended(0))
+            return false;
         // Initialize physical SSD1306 too; an adapter-only reset cannot power it on.
-        const uint8_t init1306[] = {0xAE,0xD5,0x80,0xA8,63,0xD3,0,0x40,
-            0x8D,0x14,0x20,0,0xA1,0xC8,0xDA,0x12,0x81,0x7F,
-            0xD9,0xF1,0xDB,0x40,0xA4,0xA6,0x2E,0xAF};
-        return commands(init1306,sizeof init1306);
+        const uint8_t init1306[] = { 0xAE, 0xD5, 0x80, 0xA8, 63,   0xD3, 0,    0x40, 0x8D, 0x14, 0x20, 0,    0xA1,
+                                     0xC8, 0xDA, 0x12, 0x81, 0x7F, 0xD9, 0xF1, 0xDB, 0x40, 0xA4, 0xA6, 0x2E, 0xAF };
+        return commands(init1306, sizeof init1306);
     }
     bool clearErrors() { return extended(6); }
     bool colors(uint16_t fg, uint16_t bg = 0)
@@ -157,6 +161,11 @@ public:
             count -= n;
         }
         return true;
+    }
+    bool colorizeMono(uint8_t x0, uint8_t y0, uint8_t x1, uint8_t y1, uint16_t fg, uint16_t bg)
+    {
+        uint8_t p[] = { x0, y0, x1, y1, uint8_t(fg >> 8), uint8_t(fg), uint8_t(bg >> 8), uint8_t(bg) };
+        return extended(0x17, p, sizeof p);
     }
     bool contrast(uint8_t a, uint8_t b, uint8_t c, uint8_t master = 6)
     {

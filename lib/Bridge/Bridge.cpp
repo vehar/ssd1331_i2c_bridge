@@ -406,6 +406,27 @@ static void rgb(uint16_t c, uint8_t *p)
     p[1] = (c >> 5) & 63;
     p[2] = (c & 31) << 1;
 }
+void Bridge::renderColorized(const uint8_t *p)
+{
+    send(0xA0, BRIDGE_REMAP_VALUE);
+    uint8_t windowCmd[] = { 0x15, p[0], p[2], 0x75, p[1], p[3] };
+    panel.command(windowCmd, sizeof windowCmd);
+
+    const uint16_t foreground = u16(p + 4);
+    const uint16_t background = u16(p + 6);
+    uint8_t row[192];
+    for (uint8_t y = p[1]; y <= p[3]; ++y)
+    {
+        for (uint8_t x = p[0]; x <= p[2]; ++x)
+        {
+            const uint16_t color = bit(x, y) ? foreground : background;
+            const size_t offset = size_t(x - p[0]) * 2;
+            row[offset] = color >> 8;
+            row[offset + 1] = color;
+        }
+        panel.data(row, size_t(p[2] - p[0] + 1) * 2);
+    }
+}
 void Bridge::executeExtended()
 {
     if (extHave < 3)
@@ -572,6 +593,16 @@ void Bridge::executeExtended()
         c[5] = p[3];
         panel.command(c, 6);
         panel.data(p + 4, n - 4);
+        return;
+    case 0x17: // Colorize visible mono bits in a region without changing mono RAM
+        if (n != 8)
+            break;
+        if (!window(p))
+        {
+            error = RANGE;
+            return;
+        }
+        renderColorized(p);
         return;
     case 0x20: // individual contrast + master current
         if (n != 4)

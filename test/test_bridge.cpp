@@ -55,11 +55,19 @@ int main()
     b.reset();
     // Base address rejects extension framing without touching panel.
     m.clear();
-    b.start(false); b.byte(2); b.byte(0); b.byte(0); b.byte(0); b.stop();
+    b.start(false);
+    b.byte(2);
+    b.byte(0);
+    b.byte(0);
+    b.byte(0);
+    b.stop();
     assert(err(b) == CONTROL && m.commands.empty());
-    ext(b,6,{});
+    ext(b, 6, {});
     // Secondary accepts SSD1306 packets as well as extension packets.
-    b.start(true); b.byte(0); b.byte(0xB0); b.stop();
+    b.start(true);
+    b.byte(0);
+    b.byte(0xB0);
+    b.stop();
     assert(err(b) == OK);
     // Common Adafruit-style initialization must not leak SSD1306 electrical values.
     tx(b, { 0,    0xAE, 0xD5, 0x80, 0xA8, 63,   0xD3, 0,    0x40, 0x8D, 0x14, 0x20, 0,
@@ -119,6 +127,20 @@ int main()
     m.clear();
     ext(b, 0x16, { 0, 0, 1, 0, 0xF8, 0, 0x07, 0xE0 });
     assert(m.pixels == std::vector<uint8_t>({ 0xF8, 0, 0x07, 0xE0 }));
+    b.reset();
+    ext(b, 2, { 0 });
+    tx(b, { 0x40, 0x01, 0x02 });
+    m.clear();
+    ext(b, 0x17, { 0, 0, 1, 1, 0x07, 0xE0, 0x00, 0x1F });
+    assert(m.pixels == std::vector<uint8_t>({ 0x07, 0xE0, 0x00, 0x1F, 0x00, 0x1F, 0x07, 0xE0 }));
+    assert(m.commands.back() == std::vector<uint8_t>({ 0x15, 0, 1, 0x75, 0, 1 }));
+    assert(b.ramAt(0, 0) == 0x01 && b.ramAt(1, 0) == 0x02);
+    ext(b, 0x17, { 0, 0, 96, 1, 0x07, 0xE0, 0x00, 0x1F });
+    assert(err(b) == RANGE);
+    ext(b, 6, {});
+    ext(b, 0x17, { 0, 0, 1, 1, 0x07, 0xE0, 0x00 });
+    assert(err(b) == LENGTH);
+    ext(b, 6, {});
     m.clear();
     ext(b, 0x7F, { 0xB9 });
     assert(m.commands.back()[0] == 0xB9);

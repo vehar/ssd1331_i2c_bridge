@@ -94,6 +94,7 @@ most 32-byte transactions and splits RGB rows into 12-pixel segments.
 | 14 | x0,y0,x1,y1 | Hardware dim window |
 | 15 | x0,y0,x1,y1,destinationX,destinationY | Hardware copy; destination rectangle must fit |
 | 16 | x0,y0,x1,y1,RGB565 pixels... | Row-major image blit; payload length must be 4+2×width×height |
+| 17 | x0,y0,x1,y1,fgHi,fgLo,bgHi,bgLo | Render the visible mono-buffer bits in the inclusive region with these RGB565 colors; does not modify mono RAM or global colors |
 | 20 | contrastA,contrastB,contrastC,masterCurrent | Independent contrast 0–255; current 0–15 |
 | 21 | hStep,startRow,rowCount,vStep,interval | SSD1331 hardware scroll setup; hStep 0–95, vStep 0–63, interval 0–3 |
 | 22 | 0 or 1 | Stop/start SSD1331 hardware scrolling |
@@ -116,6 +117,7 @@ not update mono RAM. Disable automatic redraw when exploring them.
 | First two mono data bytes | `40 FF 81` |
 | Explicit mono redraw | `02 03 00 00` |
 | Red pixel at (10,20) | `02 10 04 00 0A 14 F8 00` |
+| Colorize mono region (10,10)-(29,19), green on black | `02 17 08 00 0A 0A 1D 13 07 E0 00 00` |
 | Yellow diagonal line | `02 11 06 00 00 00 5F 3F FF E0` |
 | Blue filled box with white border | `02 12 09 00 0A 0A 28 1E FF FF 00 1F 01` |
 | Clear full native display | `02 13 04 00 00 00 5F 3F` |

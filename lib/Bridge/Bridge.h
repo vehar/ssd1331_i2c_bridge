@@ -70,6 +70,7 @@ private:
     void apply();
     void monoByte(uint8_t);
     void executeExtended();
+    void renderColorized(const uint8_t *p);
     void send(uint8_t c, uint8_t a);
     bool window(const uint8_t *p) const;
     bool bit(uint8_t x, uint8_t y) const;
