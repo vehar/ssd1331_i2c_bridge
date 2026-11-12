@@ -139,6 +139,7 @@ per transaction, so the bridge's execution delay separates successive operations
 - `include/config.h`: address, virtual width, viewport, remap and refresh interval.
 - `examples/esp32_master`: Arduino master helper and demonstration (not part of
   the slave build). ESP32 pins 21/22 in this example.
+- `docs/HOST_API.md`: host MCU bus setup, `BridgeClient` API and completion/error handling.
 - `docs/PROTOCOL.md`: complete implemented protocol and raw examples.
 - `docs/VALIDATION.md`: test results and hardware acceptance checks.
 - `firmware/firmware.bin`: compiled STM32 image, flash address `0x08000000`.

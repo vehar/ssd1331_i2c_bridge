@@ -1,10 +1,17 @@
-> Address update: all 0x02 extended frames and status reads below use **0x3E**. SSD1306 command/data frames use **0x3C** (also accepted at 0x3E). The base address rejects extensions and returns 0xFF on reads. Addresses are configurable in include/config.h. Both share one display state. See README.md for the CLI and shared-bus test procedure.
+The bridge responds at two 7-bit I²C addresses. **0x3C** is the base address;
+**0x3E** is the secondary address, like a second device on the bus. Both
+addresses control the same display state. SSD1306 command/data writes work at
+either address. Send all `0x02` extended frames and status reads to **0x3E**;
+the base address rejects extensions and returns `0xFF` on reads. Addresses are
+configurable in `include/config.h`. See README.md for CLI and shared-bus details.
 
 # I²C protocol, version 1
 
-Slave address: **0x3C**, 7-bit (on-wire write 0x78, read 0x79).
-Change `BRIDGE_I2C_ADDRESS` to 0x3D if needed. No subaddress/register selection
-is required. Each write starts with a control byte.
+The default base address is **0x3C** (on-wire write `0x78`, read `0x79`); the
+default secondary address is **0x3E** (on-wire write `0x7C`, read `0x7D`).
+Configure them with `BRIDGE_I2C_ADDRESS` and `BRIDGE_EXT_I2C_ADDRESS`. No
+subaddress/register selection is required. Each write starts with a control
+byte. Ordinary SSD1306 control framing is accepted at both addresses.
 
 ## SSD1306 control framing
 
@@ -14,7 +21,7 @@ is required. Each write starts with a control byte.
 | 0x40 | Remaining bytes are SSD1306 page framebuffer data |
 | 0x80 | One command/argument byte, followed by another control byte |
 | 0xC0 | One framebuffer byte, followed by another control byte |
-| 0x02 | Bridge extended transaction (intentional vendor control byte) |
+| 0x02 | Bridge extended transaction (secondary address 0x3E only) |
 
 Standard control bytes require bits 5:0 zero. Co=1 returns to control parsing
 after exactly one byte. Example mixed transfer: `80 B0 80 00 80 10 40 FF 00`.
@@ -132,9 +139,10 @@ Electrical settings remain the user's responsibility when using passthrough.
 
 ## Status read (16 bytes)
 
-A read from 0x3C returns a snapshot from byte 0 every time. Reading more than
-16 bytes returns FF for the excess. No SSD1331 RAM readback is available over
-this module's write-only SPI connection.
+A read from 0x3E returns a snapshot from byte 0 every time. Reads from the base
+address 0x3C return `0xFF`. Reading more than 16 bytes at 0x3E returns `0xFF`
+for the excess. No SSD1331 RAM readback is available over this module's
+write-only SPI connection.
 
 | Byte | Meaning |
 | --- | --- |
