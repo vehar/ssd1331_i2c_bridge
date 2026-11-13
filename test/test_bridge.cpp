@@ -3,6 +3,9 @@
 #include <cstdio>
 #include <random>
 #include <vector>
+#ifdef OVERFLOW
+#undef OVERFLOW
+#endif
 using namespace oled;
 struct Mock : Panel
 {
@@ -135,6 +138,26 @@ int main()
     assert(m.pixels == std::vector<uint8_t>({ 0x07, 0xE0, 0x00, 0x1F, 0x00, 0x1F, 0x07, 0xE0 }));
     assert(m.commands.back() == std::vector<uint8_t>({ 0x15, 0, 1, 0x75, 0, 1 }));
     assert(b.ramAt(0, 0) == 0x01 && b.ramAt(1, 0) == 0x02);
+    b.reset();
+    tx(b, { 0x40, 0x01, 0x02 });
+    ext(b, 0x17, { 0, 0, 1, 1, 0x07, 0xE0, 0x00, 0x1F });
+    ext(b, 1, { 0x00, 0x1F, 0xFF, 0xE0 });
+    m.clear();
+    b.tick(20);
+    assert(pixel(m, 0, 0) == 0x07E0 && pixel(m, 0, 1) == 0x001F);
+    assert(pixel(m, 1, 0) == 0x001F && pixel(m, 1, 1) == 0x07E0);
+    assert(pixel(m, 2, 0) == 0xFFE0);
+    tx(b, { 0, 0xB0, 0x00, 0x10 });
+    tx(b, { 0x40, 0x00 });
+    m.clear();
+    b.tick(40);
+    assert(pixel(m, 0, 0) == 0x001F);
+    b.reset();
+    for (uint8_t x = 0; x < 32; ++x)
+        ext(b, 0x17, { x, 0, x, 0, 0x07, 0xE0, 0x00, 0x1F });
+    ext(b, 0x17, { 32, 0, 32, 0, 0x07, 0xE0, 0x00, 0x1F });
+    assert(err(b) == CAPACITY);
+    ext(b, 6, {});
     ext(b, 0x17, { 0, 0, 96, 1, 0x07, 0xE0, 0x00, 0x1F });
     assert(err(b) == RANGE);
     ext(b, 6, {});

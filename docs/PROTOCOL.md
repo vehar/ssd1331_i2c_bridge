@@ -94,7 +94,7 @@ most 32-byte transactions and splits RGB rows into 12-pixel segments.
 | 14 | x0,y0,x1,y1 | Hardware dim window |
 | 15 | x0,y0,x1,y1,destinationX,destinationY | Hardware copy; destination rectangle must fit |
 | 16 | x0,y0,x1,y1,RGB565 pixels... | Row-major image blit; payload length must be 4+2×width×height |
-| 17 | x0,y0,x1,y1,fgHi,fgLo,bgHi,bgLo | Render the visible mono-buffer bits in the inclusive region with these RGB565 colors; does not modify mono RAM or global colors |
+| 17 | x0,y0,x1,y1,fgHi,fgLo,bgHi,bgLo | Render the visible mono-buffer bits in the inclusive region with these RGB565 colors; does not modify mono RAM or global colors; saves the region colors for later redraws |
 | 20 | contrastA,contrastB,contrastC,masterCurrent | Independent contrast 0–255; current 0–15 |
 | 21 | hStep,startRow,rowCount,vStep,interval | SSD1331 hardware scroll setup; hStep 0–95, vStep 0–63, interval 0–3 |
 | 22 | 0 or 1 | Stop/start SSD1331 hardware scrolling |
@@ -161,7 +161,10 @@ write-only SPI connection.
 | 14–15 | Background RGB565, big-endian |
 
 Errors: 0 OK, 1 invalid control, 2 unknown command, 3 payload length, 4 range,
-5 queue overflow, 6 I²C bus error. A successful ordinary command does not clear
+5 queue overflow, 6 I²C bus error, 7 color-region capacity. Up to 32 color regions
+are retained; newer regions take priority when they overlap, and a containing
+region replaces older regions fully inside it. Reset clears all retained regions.
+A successful ordinary command does not clear
 an earlier error. No explicit READY pin is provided. Poll until queue=0 and
 processing=0; then check the sticky error. For mono redraw completion also
 wait until dirty=0 (only meaningful with auto refresh on), or send explicit

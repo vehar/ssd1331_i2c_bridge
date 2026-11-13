@@ -134,7 +134,8 @@ native image. For SSD1306-compatible command/data framing, use `commands()` and
 
 `colorizeMono()` reads the existing mono bits through the current display
 mapping (including geometry, viewport/scale, inversion and scrolling) and
-renders only that visible region with the supplied RGB565 colors. It does not
-change mono RAM or the global `colors()` setting. Disable automatic refresh,
-render the mono image first, then colorize regions; a later full mono redraw
-restores the global mono colors, so reapply region colors afterward.
+renders that visible region with the supplied RGB565 colors. It does not change
+mono RAM or the global `colors()` setting. Up to 32 regions are retained across
+automatic and explicit mono redraws; newer overlapping regions take priority.
+Reset clears them. If all region slots are occupied, the command reports status
+error 7 (`CAPACITY`).

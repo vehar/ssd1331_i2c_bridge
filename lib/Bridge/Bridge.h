@@ -19,7 +19,8 @@ enum Error : uint8_t
     LENGTH = 3,
     RANGE = 4,
     OVERFLOW = 5,
-    BUS = 6
+    BUS = 6,
+    CAPACITY = 7
 };
 class Bridge
 {
@@ -49,8 +50,16 @@ public:
     uint8_t ramAt(uint8_t x, uint8_t page) const { return ram[page * 128 + x]; }
 
 private:
+    struct ColorRegion
+    {
+        uint8_t x0, y0, x1, y1;
+        uint16_t fg, bg;
+    };
+    static constexpr uint8_t COLOR_REGION_CAPACITY = 32;
     Panel &panel;
     uint8_t ram[1024]{};
+    ColorRegion colorRegions[COLOR_REGION_CAPACITY]{};
+    uint8_t colorRegionCount = 0;
     uint8_t bootWidth, bootViewport;
     uint8_t width, viewport, col = 0, page = 0, cs = 0, ce = 127, ps = 0, pe = 7, mode = 2;
     uint8_t startLine = 0, offset = 0, multiplex = 63;
@@ -71,6 +80,7 @@ private:
     void monoByte(uint8_t);
     void executeExtended();
     void renderColorized(const uint8_t *p);
+    bool rememberColorRegion(const uint8_t *p);
     void send(uint8_t c, uint8_t a);
     bool window(const uint8_t *p) const;
     bool bit(uint8_t x, uint8_t y) const;

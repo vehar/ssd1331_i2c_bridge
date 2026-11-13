@@ -30,6 +30,7 @@ void Bridge::reset()
 {
     panel.init();
     memset(ram, 0, sizeof ram);
+    colorRegionCount = 0;
     width = bootWidth;
     viewport = bootViewport;
     col = page = cs = ps = 0;
@@ -368,7 +369,17 @@ void Bridge::render()
     {
         for (uint8_t x = 0; x < 96; ++x)
         {
-            uint16_t c = bit(x, y) ? fg : bg;
+            uint16_t foreground = fg, background = bg;
+            for (uint8_t i = 0; i < colorRegionCount; ++i)
+            {
+                const ColorRegion &region = colorRegions[i];
+                if (x >= region.x0 && x <= region.x1 && y >= region.y0 && y <= region.y1)
+                {
+                    foreground = region.fg;
+                    background = region.bg;
+                }
+            }
+            uint16_t c = bit(x, y) ? foreground : background;
             row[2 * x] = c >> 8;
             row[2 * x + 1] = c;
         }
@@ -400,6 +411,26 @@ void Bridge::tick(uint32_t now)
 }
 bool Bridge::window(const uint8_t *p) const { return p[0] <= p[2] && p[1] <= p[3] && p[2] < 96 && p[3] < 64; }
 static uint16_t u16(const uint8_t *p) { return (uint16_t(p[0]) << 8) | p[1]; }
+bool Bridge::rememberColorRegion(const uint8_t *p)
+{
+    const uint8_t x0 = p[0], y0 = p[1], x1 = p[2], y1 = p[3];
+    for (uint8_t i = 0; i < colorRegionCount;)
+    {
+        const ColorRegion &region = colorRegions[i];
+        if (x0 <= region.x0 && y0 <= region.y0 && x1 >= region.x1 && y1 >= region.y1)
+        {
+            for (uint8_t j = i; j + 1 < colorRegionCount; ++j)
+                colorRegions[j] = colorRegions[j + 1];
+            --colorRegionCount;
+        }
+        else
+            ++i;
+    }
+    if (colorRegionCount == COLOR_REGION_CAPACITY)
+        return false;
+    colorRegions[colorRegionCount++] = { x0, y0, x1, y1, u16(p + 4), u16(p + 6) };
+    return true;
+}
 static void rgb(uint16_t c, uint8_t *p)
 {
     p[0] = ((c >> 11) & 31) << 1;
@@ -600,6 +631,11 @@ void Bridge::executeExtended()
         if (!window(p))
         {
             error = RANGE;
+            return;
+        }
+        if (!rememberColorRegion(p))
+        {
+            error = CAPACITY;
             return;
         }
         renderColorized(p);
